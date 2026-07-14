@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>楽天ROOMトラッカー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; background: #f8f9fa; color: #1a1a2e; }
+.app { max-width: 430px; margin: 0 auto; min-height: 100vh; padding-bottom: 32px; }
+
+.topbar {
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 14px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 10;
+}
+.topbar-left .title { font-size: 15px; font-weight: 700; color: #1a1a2e; }
+.topbar-left .sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+.topbar-right { display: flex; gap: 6px; }
+.btn { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; color: #6b7280; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+
+.metrics-wrap { padding: 10px 14px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.metric-card {
+  background: #fff;
+  border: 1.5px solid #f0f0f0;
+  border-radius: 10px;
+  padding: 10px 6px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  text-align: center;
+}
+.metric-card[data-metric="followers"] { --accent: #3b82f6; }
+.metric-card[data-metric="following"] { --accent: #10b981; }
+.metric-card[data-metric="posts"]     { --accent: #f59e0b; }
+.metric-card[data-metric="likes"]     { --accent: #ef4444; }
+.metric-card.active { border-color: var(--accent); border-width: 2px; }
+.m-label { font-size: 9px; color: #9ca3af; font-weight: 500; margin-bottom: 4px; }
+.metric-card.active .m-label { color: var(--accent); font-weight: 600; }
+.m-val { font-size: 18px; font-weight: 700; color: #1a1a2e; letter-spacing: -0.5px; margin-bottom: 3px; }
+.metric-card.active .m-val { color: var(--accent); }
+.m-diff { font-size: 9px; font-weight: 600; color: #9ca3af; }
+.m-diff.up { color: #10b981; }
+.m-diff.down { color: #ef4444; }
+
+.chart-wrap { padding: 10px 14px 0; }
+.chart-card { background: #fff; border-radius: 14px; border: 1px solid #f0f0f0; padding: 16px; }
+.chart-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.chart-title { font-size: 13px; font-weight: 600; color: #374151; }
+.scope-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.scope-tabs::-webkit-scrollbar { display: none; }
+.scope-btn { flex-shrink: 0; padding: 4px 10px; border-radius: 6px; background: transparent; color: #9ca3af; font-size: 11px; font-weight: 600; border: none; cursor: pointer; white-space: nowrap; }
+.scope-btn.active { background: #f3f4f6; color: #374151; }
+
+.history-wrap { padding: 10px 14px 0; }
+.history-card { background: #fff; border-radius: 14px; border: 1px solid #f0f0f0; overflow: hidden; }
+.history-toggle { width: 100%; padding: 13px 16px; border: none; background: transparent; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600; color: #374151; }
+.toggle-arrow { font-size: 10px; color: #9ca3af; transition: transform 0.2s; }
+.history-toggle.open .toggle-arrow { transform: rotate(180deg); }
+.history-body { display: none; border-top: 1px solid #f0f0f0; overflow-x: auto; }
+.history-body.open { display: block; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 320px; }
+th { padding: 8px 10px; text-align: right; color: #9ca3af; font-weight: 600; border-bottom: 1px solid #f0f0f0; background: #fafafa; font-size: 10px; }
+th:first-child { text-align: left; }
+td { padding: 10px 10px; text-align: right; color: #374151; font-weight: 600; border-bottom: 1px solid #f9fafb; }
+td:first-child { text-align: left; color: #9ca3af; font-weight: 500; }
+tr:last-child td { border-bottom: none; }
+
+.empty { padding: 36px; text-align: center; color: #9ca3af; font-size: 12px; }
+
+.rank-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; display: inline-block; margin-left: 4px; }
+.rank-a { background: #fef9c3; color: #854d0e; }
+.rank-b { background: #f1f5f9; color: #475569; }
+.rank-c { background: #fef3c7; color: #92400e; }
+.rank-d { background: #f0fdf4; color: #166534; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="title">楽天ROOMトラッカー</div>
+      <div class="sub"><span id="lastdate">読み込み中...</span> <span id="rank-badge"></span></div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn" id="refresh-btn" onclick="refreshData()">↻ 更新</button>
+    </div>
+  </div>
+
+  <div class="metrics-wrap">
+    <div class="metric-card active" data-metric="followers" onclick="setMetric('followers',this)">
+      <div class="m-label">フォロワー</div>
+      <div class="m-val" id="mt-followers">—</div>
+      <div class="m-diff" id="md-followers">前日比 —</div>
+    </div>
+    <div class="metric-card" data-metric="following" onclick="setMetric('following',this)">
+      <div class="m-label">フォロー</div>
+      <div class="m-val" id="mt-following">—</div>
+      <div class="m-diff" id="md-following">前日比 —</div>
+    </div>
+    <div class="metric-card" data-metric="posts" onclick="setMetric('posts',this)">
+      <div class="m-label">投稿数</div>
+      <div class="m-val" id="mt-posts">—</div>
+      <div class="m-diff" id="md-posts">前日比 —</div>
+    </div>
+    <div class="metric-card" data-metric="likes" onclick="setMetric('likes',this)">
+      <div class="m-label">いいね（送った数）</div>
+      <div class="m-val" id="mt-likes">—</div>
+      <div class="m-diff" id="md-likes">前日比 —</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-card">
+      <div class="chart-top">
+        <div class="chart-title" id="chart-title">フォロワー数の推移</div>
+        <div class="scope-tabs">
+          <button onclick="setScope('1w',this)" class="scope-btn active">1週</button>
+          <button onclick="setScope('1m',this)" class="scope-btn">1ヶ月</button>
+          <button onclick="setScope('3m',this)" class="scope-btn">3ヶ月</button>
+          <button onclick="setScope('1y',this)" class="scope-btn">1年</button>
+          <button onclick="setScope('all',this)" class="scope-btn">全期間</button>
+        </div>
+      </div>
+      <div style="position:relative; height:180px;">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="history-wrap">
+    <div class="history-card">
+      <button class="history-toggle" onclick="toggleHistory(this)">
+        <span>取得履歴</span>
+        <span class="toggle-arrow">▼</span>
+      </button>
+      <div class="history-body" id="history-body">
+        <div class="empty">▲ タップして展開</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const LABELS = { followers:'フォロワー数', following:'フォロー数', posts:'投稿数', likes:'いいね数' };
+const COLORS  = { followers:'#3b82f6', following:'#10b981', posts:'#f59e0b', likes:'#ef4444' };
+const SCOPES  = { '1w':7, '1m':30, '3m':90, '1y':365, 'all':99999 };
+
+let allRows = [], latest = null, prev = null;
+let currentMetric = 'followers', currentScope = '1w', chartInst = null;
+
+function toggleHistory(btn) {
+  const body = document.getElementById('history-body');
+  btn.classList.toggle('open');
+  body.classList.toggle('open');
+  if (body.classList.contains('open')) renderHistory();
+}
+
+function setMetric(metric, el) {
+  currentMetric = metric;
+  document.querySelectorAll('.metric-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('chart-title').textContent = LABELS[metric] + 'の推移';
+  renderChart();
+}
+
+function setScope(scope, btn) {
+  currentScope = scope;
+  document.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderChart();
+}
+
+function filterRows() {
+  const days = SCOPES[currentScope] || 7;
+  if (days >= 99999) return allRows;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  return allRows.filter(r => new Date(r.date) >= cutoff);
+}
+
+function loadData() {
+  try {
+    const result = JSON.parse('<?= initialData ?>');
+    onData(result);
+  } catch(e) {
+    document.getElementById('lastdate').textContent = 'エラー';
+  }
+}
+
+function onData(result) {
+  if (result.error) {
+    document.getElementById('lastdate').textContent = result.error;
+    return;
+  }
+  allRows = result.rows || [];
+  latest  = result.latest;
+  prev    = result.prev;
+
+  document.getElementById('lastdate').textContent = latest ? '最終取得: ' + latest.date : 'データなし';
+
+  const rank = latest && latest.rank ? latest.rank.toUpperCase() : null;
+  const rankEl = document.getElementById('rank-badge');
+  if (rankEl && rank) {
+    rankEl.textContent = 'ROOMer ' + rank;
+    rankEl.className = 'rank-badge rank-' + latest.rank.toLowerCase();
+  }
+
+  ['followers','following','posts','likes'].forEach(k => {
+    const v = document.getElementById('mt-' + k);
+    if (v) v.textContent = latest && latest[k] != null ? latest[k].toLocaleString() : '—';
+    const d = document.getElementById('md-' + k);
+    if (d) {
+      if (prev && latest && latest[k] != null && prev[k] != null) {
+        const diff = latest[k] - prev[k];
+        d.textContent = '前日比 ' + (diff >= 0 ? '+' : '') + diff.toLocaleString();
+        d.className = 'm-diff ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : '');
+      } else {
+        d.textContent = '前日比 —';
+        d.className = 'm-diff';
+      }
+    }
+  });
+
+  renderChart();
+}
+
+function renderChart() {
+  const color = COLORS[currentMetric];
+  const rows  = filterRows();
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+      labels: rows.map(r => r.date.slice(5, 10)),
+      datasets: [{
+        data: rows.map(r => r[currentMetric]),
+        borderColor: color,
+        backgroundColor: color + '18',
+        borderWidth: 2,
+        pointRadius: rows.length > 30 ? 0 : 4,
+        pointBackgroundColor: '#fff',
+        pointBorderColor: color,
+        pointBorderWidth: 2,
+        fill: true, tension: 0.4, spanGaps: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9ca3af', maxTicksLimit: 5, autoSkip: true } },
+        y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, color: '#9ca3af' }, border: { display: false } }
+      },
+      interaction: { intersect: false, mode: 'index' }
+    }
+  });
+}
+
+function renderHistory() {
+  if (!allRows.length) {
+    document.getElementById('history-body').innerHTML = '<div class="empty">データがありません</div>';
+    return;
+  }
+  const rows = [...allRows].reverse().slice(0, 50);
+  document.getElementById('history-body').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>日時</th><th>フォロワー</th><th>フォロー</th><th>投稿</th><th>いいね</th>
+      </tr></thead>
+      <tbody>${rows.map(r => `
+        <tr>
+          <td>${r.date}</td>
+          <td>${r.followers != null ? r.followers.toLocaleString() : '—'}</td>
+          <td>${r.following != null ? r.following.toLocaleString() : '—'}</td>
+          <td>${r.posts     != null ? r.posts.toLocaleString()     : '—'}</td>
+          <td>${r.likes     != null ? r.likes.toLocaleString()     : '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.textContent = '↻ …'; btn.disabled = true; }
+  google.script.run
+    .withSuccessHandler(result => {
+      if (result && !result.error) onData(result);
+      if (btn) { btn.textContent = '↻ 更新'; btn.disabled = false; }
+      const body = document.getElementById('history-body');
+      if (body.classList.contains('open')) renderHistory();
+    })
+    .withFailureHandler(() => {
+      if (btn) { btn.textContent = '↻ 更新'; btn.disabled = false; }
+    })
+    .getData('1y');
+}
+
+loadData();
+</script>
+</body>
+</html>
