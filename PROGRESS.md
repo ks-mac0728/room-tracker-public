@@ -8,15 +8,26 @@
 - 日時: 2026-07-15
 
 ## 前回やったこと
-- プロジェクト作成
-
-## 次にやること
-- GAS（Code.js・Index.html）の軽量版を実装
-- iOSショートカット用JS（ios_shortcut_js.js）を整備
+- Code.js（GASバックエンド）を実装
+  - `doGet`: Index.htmlダッシュボードを配信
+  - `doPost`: iOSショートカットからの `receiveStats` を受取・スプレッドシートに書込（1日1行upsert）
+  - APIキー認証（api_secret_key設定時のみ有効）
+- Index.html（ダッシュボードUI）を実装
+  - メトリクスカード（フォロワー・フォロー・投稿数・いいね、前日比付き）
+  - Chart.jsグラフ（期間切替: 1週/1ヶ月/3ヶ月/1年/全期間）
+  - 取得履歴テーブル
+  - ↻更新ボタン（GASサーバーサイドから再取得）
+- ios_shortcut_js.js（既存と同一）を整備
+- appsscript.json（GASマニフェスト）を作成
 - README.md（セットアップ手順）を作成
 
+## 次にやること
+- GASプロジェクトにデプロイしてWebアプリURLを取得する
+- iOSショートカットを実際に作成して動作確認する
+- 必要に応じてDOM抽出パターン（ios_shortcut_js.js）を調整する
+
 ## 未完了の課題
-- なし
+- 実機テスト未実施（GASデプロイ・iOSショートカット動作確認）
 
 ## ユーザーの意図・構想
 - 楽天ROOMの成果をトラッキングするダッシュボードを他ユーザーに配布したい
@@ -25,3 +36,5 @@
 - 毎日の通知を1タップするだけ、またはダッシュボードの「更新」ボタンで手動更新
 - Threads投稿機能はスコープ外（ダッシュボード機能のみ）
 - 既存の rakuten-room-tracker とは完全に別プロジェクトとして管理
+- データスキーマは既存の rakuten-room-tracker と同一（followers/following/posts/likes/rank）
+- 他ユーザーがコピーして使えるテンプレートとして配布
