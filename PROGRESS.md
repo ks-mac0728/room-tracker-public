@@ -9,11 +9,13 @@
 
 ## 前回やったこと
 - Code.js / Index.html / ios_shortcut_js.js / appsscript.json / README.md を実装
-- clasp で GAS プロジェクト作成・デプロイ
-- ios_shortcut_js.js が GAS サーバー側に誤ってデプロイされてエラーになる問題を修正
-  - .claspignore に追加して GAS プッシュから除外
-  - GAS API 経由でファイルを削除し再デプロイ
+- clasp で GAS プロジェクト作成・コードプッシュ・WebAppデプロイ
+- ios_shortcut_js.js が GAS サーバー側に混入してエラー → .claspignore で修正・再デプロイ
 - ダッシュボード表示を確認済み
+- ios_shortcut_js.js に `action: "receiveStats"` を含めてショートカットを2ステップに簡略化
+- shortcut_template.shortcut（タップでインストール用）を生成・GitHubに公開
+- GitHubリポジトリをpublicに変更済み
+- jsDelivr経由でのファイル配信は成功（200）だが、iOS側で「未署名のショートカット」エラーが出てインストール不可
 
 ## WebアプリURL（デプロイ済み）
 ```
@@ -25,13 +27,23 @@ https://script.google.com/macros/s/AKfycbyzLvVzPzT16OzGwAwYbFstGJyUqeTve1R3r-wIq
 https://drive.google.com/open?id=1F6hXasIeIco3l6JSPOEKU0ySSBViiO4mZ9-ZT40q-9g
 ```
 
-## 次にやること
-- iOSショートカットを作成してデータ送信テスト
-- 実際にデータが記録されるか（スプレッドシート「記録」シート）確認
-- 必要に応じて ios_shortcut_js.js の DOM抽出パターンを調整
+## ショートカット配布URL（現状）
+```
+https://cdn.jsdelivr.net/gh/ks-mac0728/room-tracker-public@main/shortcut_template.shortcut
+```
+※ iOS側で「信頼されていないショートカット」エラーになる。設定→ショートカット→「信頼されていないショートカットを許可」をオンにすれば回避可能。
+
+## 次にやること（優先順）
+1. ショートカットのインストール方法を解決する
+   - 案A: ユーザーに「信頼されていないショートカットを許可」をオンにしてもらう（設定→ショートカット）
+   - 案B: RoutineHub などのサービスにショートカットを登録して iCloud 署名済みリンクを取得する
+   - 案C: 手動で2ステップ作る（コピペのみ、確実）
+2. iOSショートカットを実際に実行してデータ送信テスト
+3. スプレッドシートの「記録」シートにデータが入ることを確認
 
 ## 未完了の課題
-- iOSショートカット動作確認未実施
+- iOSショートカットのインストール・動作確認が未完了
+- Chromeでは使えない（Safari専用）
 
 ## ユーザーの意図・構想
 - 楽天ROOMの成果をトラッキングするダッシュボードを他ユーザーに配布したい
