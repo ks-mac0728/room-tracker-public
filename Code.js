@@ -44,17 +44,20 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
+    Logger.log("doPost受信: parameter=" + JSON.stringify(e.parameter) + " / postData=" + (e.postData ? e.postData.contents : "(なし)"));
     // フォーム送信（ブックマークレット）はe.parameter.payloadに、
     // 生のJSON POST（iOSショートカット等）はe.postData.contentsに入る。両対応。
     const data   = (e.parameter && e.parameter.payload)
       ? JSON.parse(e.parameter.payload)
       : JSON.parse(e.postData.contents);
     const action = data.action || "";
+    Logger.log("解析結果: action=" + action + " / data=" + JSON.stringify(data));
 
     if (action === "receiveStats") {
       const cfg       = getConfig();
       const secretKey = cfg["api_secret_key"] || "";
       if (secretKey && data.api_key !== secretKey) {
+        Logger.log("認証エラーで終了");
         return _json({ ok: false, error: "認証エラー: api_keyが不正です" });
       }
       const url = data.url || cfg["room_url"] || "";
@@ -66,9 +69,11 @@ function doPost(e) {
         rank:      data.rank || "",
       });
       if (url) saveSetting("room_url", url);
+      Logger.log("記録完了: url=" + url);
       return _json({ ok: true });
     }
 
+    Logger.log("unknown action: " + action);
     return _json({ ok: false, error: "unknown action" });
   } catch (err) {
     return _json({ ok: false, error: err.toString() });
