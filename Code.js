@@ -137,7 +137,12 @@ function dailyFetch() {
  * ROOMのプロフィールページはログイン無しでもSSRされたJSONを含むため、UrlFetchAppのみで完結する。
  */
 function fetchAndRecord(url) {
-  const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  const res = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    },
+  });
   if (res.getResponseCode() !== 200) {
     throw new Error("ROOMページの取得に失敗しました（HTTP " + res.getResponseCode() + "）");
   }
