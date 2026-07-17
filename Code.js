@@ -141,10 +141,14 @@ function fetchAndRecord(url) {
     muteHttpExceptions: true,
     headers: {
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
     },
   });
   if (res.getResponseCode() !== 200) {
-    throw new Error("ROOMページの取得に失敗しました（HTTP " + res.getResponseCode() + "）");
+    Logger.log("ROOM取得失敗の詳細。ステータス: " + res.getResponseCode());
+    Logger.log("レスポンス本文（先頭500文字）: " + res.getContentText().substring(0, 500));
+    throw new Error("ROOMページの取得に失敗しました（HTTP " + res.getResponseCode() + "）。詳細は実行ログを確認してください");
   }
   const state = _extractInitialState(res.getContentText());
   if (!state || !state.userData) {
