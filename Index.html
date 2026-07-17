@@ -193,7 +193,7 @@ const COLORS  = { followers:'#3b82f6', following:'#10b981', posts:'#f59e0b', lik
 const SCOPES  = { '1w':7, '1m':30, '3m':90, '1y':365, 'all':99999 };
 
 const WEBAPP_URL = '<?= baseUrl ?>';
-const BOOKMARKLET_CODE = "javascript:(function(){var u=(window.__INITIAL_STATE__&&window.__INITIAL_STATE__.userData)||{};var d={action:'receiveStats',url:location.href,followers:u.followers,following:u.following_users,posts:u.collections,likes:u.likes,rank:u.rank!=null?String(u.rank):''};try{navigator.sendBeacon('" + WEBAPP_URL + "',new Blob([JSON.stringify(d)],{type:'application/json'}));}catch(e){}alert('楽天ROOMトラッカー: 記録しました');})();";
+const BOOKMARKLET_CODE = "javascript:(function(){var u=(window.__INITIAL_STATE__&&window.__INITIAL_STATE__.userData)||{};var d={action:'receiveStats',url:location.href,followers:u.followers,following:u.following_users,posts:u.collections,likes:u.likes,rank:u.rank!=null?String(u.rank):''};var ok=false;try{ok=navigator.sendBeacon('" + WEBAPP_URL + "',new Blob([JSON.stringify(d)],{type:'text/plain'}));}catch(e){}alert(ok?'楽天ROOMトラッカー: 送信しました':'送信に失敗しました。通信環境を確認してもう一度お試しください');})();";
 
 function toggleBookmarklet(btn) {
   const body = document.getElementById('bookmarklet-body');
