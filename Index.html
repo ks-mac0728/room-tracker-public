@@ -358,7 +358,7 @@ function refreshData() {
     .withFailureHandler(() => {
       if (btn) { btn.textContent = '↻ 更新'; btn.disabled = false; }
     })
-    .refreshNow();
+    .refreshView();
 }
 
 loadData();

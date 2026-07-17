@@ -15,31 +15,16 @@ const INFO_FORM_ENTRY_MAP = {
 };
 
 /**
- * 初回セットアップ用。Apps Scriptエディタはデフォルトでファイル先頭の関数を選択した状態で開くため、
+ * Apps Scriptエディタはデフォルトでファイル先頭の関数を選択した状態で開くため、
  * この関数をファイルの先頭に置いてある（プルダウンで選び直さず、そのまま▶実行ボタンを押すだけで良いように）。
- * 毎日の自動取得トリガーだけを設定する。Webアプリとしてのデプロイ（ダッシュボードを見るためのURL発行）は、
- * Apps Script APIがコピーごとのデフォルトGCPプロジェクトで無効化されており自動化できないため、
- * 別途、手動での「デプロイ→新しいデプロイ→ウェブアプリ」を行う（README参照）。
- * データの自動収集自体は、このsetup実行だけで動き出す（デプロイの有無に関係なくトリガーは動作する）。
+ * ROOMのデータ取得はGASサーバーからは行わない（楽天側のAkamaiボット対策により、
+ * UrlFetchAppでの直接アクセスは常にブロックされることを確認済み）。
+ * 実際の取得は本物のブラウザ（iOSショートカット。README参照）が行い、ここへPOSTする。
+ * この関数は「設定」シートの用意を確認するだけの簡単な初期化用。
  */
 function setup() {
-  const cfg = getConfig();
-  _setupDailyTrigger(Number(cfg["fetch_hour"]) || 7);
-  if (cfg["room_url"]) {
-    fetchAndRecord(cfg["room_url"]);
-  }
-  Logger.log("トリガー設定完了。ダッシュボードを見るには、続けて「デプロイ→新しいデプロイ→ウェブアプリ」を行ってください。");
-}
-
-function _setupDailyTrigger(hour) {
-  ScriptApp.getProjectTriggers().forEach(t => {
-    if (t.getHandlerFunction() === "dailyFetch") ScriptApp.deleteTrigger(t);
-  });
-  ScriptApp.newTrigger("dailyFetch")
-    .timeBased()
-    .everyDays(1)
-    .atHour(hour)
-    .create();
+  _settingsSheet();
+  Logger.log("準備完了。続けて「デプロイ→新しいデプロイ→ウェブアプリ」でダッシュボードURLを発行し、READMEの手順でiOSショートカットを設定してください。");
 }
 
 function doGet(e) {
@@ -51,6 +36,39 @@ function doGet(e) {
   const output = tmpl.evaluate();
   output.addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
   return output;
+}
+
+/**
+ * iOSショートカットからのPOSTを受け取る。実際のROOMページ取得・解析はショートカット側
+ * （本物のSafari＋JS実行）が既に終えた状態でここに届くため、GAS側はデータの受け取り・記録のみ行う。
+ */
+function doPost(e) {
+  try {
+    const data   = JSON.parse(e.postData.contents);
+    const action = data.action || "";
+
+    if (action === "receiveStats") {
+      const cfg       = getConfig();
+      const secretKey = cfg["api_secret_key"] || "";
+      if (secretKey && data.api_key !== secretKey) {
+        return _json({ ok: false, error: "認証エラー: api_keyが不正です" });
+      }
+      const url = data.url || cfg["room_url"] || "";
+      _writeRecord(url, {
+        followers: data.followers,
+        following: data.following,
+        posts:     data.posts,
+        likes:     data.likes,
+        rank:      data.rank || "",
+      });
+      if (url) saveSetting("room_url", url);
+      return _json({ ok: true });
+    }
+
+    return _json({ ok: false, error: "unknown action" });
+  } catch (err) {
+    return _json({ ok: false, error: err.toString() });
+  }
 }
 
 function _fetchDashboardHtml() {
@@ -110,103 +128,11 @@ function getData(scope) {
 }
 
 /**
- * ダッシュボードの「更新」ボタンから呼ばれる。その場でROOMページを取得し直して記録・返却する。
+ * ダッシュボードの「更新」ボタンから呼ばれる。GASはROOMへ直接アクセスできないため、
+ * ここでは「記録」シートを再読み込みするだけ（ショートカットで新しく送信された分を反映する）。
  */
-function refreshNow() {
-  const cfg     = getConfig();
-  const roomUrl = cfg["room_url"];
-  if (!roomUrl) {
-    throw new Error("ROOM URLがまだ設定されていません");
-  }
-  fetchAndRecord(roomUrl);
+function refreshView() {
   return getData('1y');
-}
-
-/**
- * 時間主導トリガーから毎日呼ばれる。
- */
-function dailyFetch() {
-  const cfg     = getConfig();
-  const roomUrl = cfg["room_url"];
-  if (!roomUrl) return;
-  fetchAndRecord(roomUrl);
-}
-
-/**
- * 指定したROOMプロフィールURLを取得し、__INITIAL_STATE__からフォロワー数等を抽出して記録する。
- * ROOMのプロフィールページはログイン無しでもSSRされたJSONを含むため、UrlFetchAppのみで完結する。
- */
-function fetchAndRecord(url) {
-  const res = UrlFetchApp.fetch(url, {
-    muteHttpExceptions: true,
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-    },
-  });
-  if (res.getResponseCode() !== 200) {
-    Logger.log("ROOM取得失敗の詳細。ステータス: " + res.getResponseCode());
-    Logger.log("レスポンス本文（先頭500文字）: " + res.getContentText().substring(0, 500));
-    throw new Error("ROOMページの取得に失敗しました（HTTP " + res.getResponseCode() + "）。詳細は実行ログを確認してください");
-  }
-  const state = _extractInitialState(res.getContentText());
-  if (!state || !state.userData) {
-    throw new Error("ROOMページの解析に失敗しました（ページ構造が変わった可能性があります）");
-  }
-  const u = state.userData;
-  _writeRecord(url, {
-    followers: u.followers,
-    following: u.following_users,
-    posts:     u.collections,
-    likes:     u.likes,
-    rank:      u.rank != null ? String(u.rank) : "",
-  });
-}
-
-/**
- * HTML内に埋め込まれた `__INITIAL_STATE__ = {...};` のJSONオブジェクトを、
- * 波カッコの対応を数えることで安全に抜き出す（投稿本文中に { が含まれていても崩れない）。
- */
-function _extractInitialState(html) {
-  const marker = "__INITIAL_STATE__";
-  const markerIdx = html.indexOf(marker);
-  if (markerIdx === -1) return null;
-  const braceStart = html.indexOf("{", markerIdx);
-  if (braceStart === -1) return null;
-
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = braceStart; i < html.length; i++) {
-    const ch = html.charAt(i);
-    if (inString) {
-      if (escape) {
-        escape = false;
-      } else if (ch === "\\") {
-        escape = true;
-      } else if (ch === "\"") {
-        inString = false;
-      }
-      continue;
-    }
-    if (ch === "\"") {
-      inString = true;
-    } else if (ch === "{") {
-      depth++;
-    } else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        const jsonStr = html.substring(braceStart, i + 1);
-        try {
-          return JSON.parse(jsonStr);
-        } catch (e) {
-          return null;
-        }
-      }
-    }
-  }
-  return null;
 }
 
 function getConfig() {
@@ -277,10 +203,9 @@ function _settingsSheet() {
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_SETTINGS);
     sheet.getRange(1, 1, 1, 2).setValues([["キー", "値"]]);
-    sheet.getRange(2, 1, 3, 2).setValues([
+    sheet.getRange(2, 1, 2, 2).setValues([
       ["room_url", ""],
-      ["fetch_hour", "7"],
-      ["webapp_url", ""],
+      ["api_secret_key", ""],
     ]);
   }
   return sheet;
@@ -319,8 +244,8 @@ function submitInfo(key, value) {
 }
 
 /**
- * 初回のROOM URL入力フォームから呼ばれる。ROOM URLを保存して即座に1回取得し、
- * オプトインでメールアドレスが渡されていれば submitInfo にも回す。
+ * 初回のROOM URL入力フォームから呼ばれる。表示用にROOM URLを保存するだけで、
+ * GAS側からの取得は行わない（データはiOSショートカットからのdoPostで届く）。
  * google.script.run経由（＝Webアプリとして実行されている）なのでgetUi()の制約を受けない。
  */
 function completeOnboarding(roomUrl, optinEmail) {
@@ -329,7 +254,6 @@ function completeOnboarding(roomUrl, optinEmail) {
     throw new Error("ROOM URLを入力してください");
   }
   saveSetting("room_url", roomUrl);
-  fetchAndRecord(roomUrl);
   if (optinEmail) {
     submitInfo("email", optinEmail);
   }
@@ -343,4 +267,9 @@ function completeOnboarding(roomUrl, optinEmail) {
  */
 function onOpen(e) {
   _settingsSheet();
+}
+
+function _json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
