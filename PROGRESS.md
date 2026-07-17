@@ -3,6 +3,9 @@
 ## 最終更新
 2026-07-17
 
+## 運用メモ（重要）
+- **`Index.html`をpushしたら、毎回jsDelivrのキャッシュを手動でパージすること**（`curl "https://purge.jsdelivr.net/gh/ks-mac0728/room-tracker-public@main/Index.html"`）。`s-maxage=43200`（12時間）でキャッシュされるため、パージしないと最大12時間ほど古いUIが配信され続ける。実際にこれが原因でユーザーが「UIが変わっていない」と気づいた事例あり（2026-07-17）
+
 ## 最後の作業環境
 - 端末: 開発Mac
 - 日時: 2026-07-17
