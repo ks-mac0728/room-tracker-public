@@ -44,7 +44,11 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
-    const data   = JSON.parse(e.postData.contents);
+    // フォーム送信（ブックマークレット）はe.parameter.payloadに、
+    // 生のJSON POST（iOSショートカット等）はe.postData.contentsに入る。両対応。
+    const data   = (e.parameter && e.parameter.payload)
+      ? JSON.parse(e.parameter.payload)
+      : JSON.parse(e.postData.contents);
     const action = data.action || "";
 
     if (action === "receiveStats") {
