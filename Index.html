@@ -103,8 +103,27 @@ tr:last-child td { border-bottom: none; }
       <div class="sub"><span id="lastdate">読み込み中...</span> <span id="rank-badge"></span></div>
     </div>
     <div class="topbar-right">
-      <a class="btn" id="run-shortcut-btn" href="shortcuts://run-shortcut?name=%E6%A5%BD%E5%A4%A9ROOM%E3%83%88%E3%83%A9%E3%83%83%E3%82%AB%E3%83%BC">▶ 記録する</a>
+      <a class="btn" id="open-room-btn" href="<?= roomUrl ?>" target="_blank" rel="noopener">▶ ROOMを開く</a>
       <button class="btn" id="refresh-btn" onclick="refreshData()">↻ 更新</button>
+    </div>
+  </div>
+
+  <div class="chart-wrap" style="padding-top:10px;">
+    <div class="chart-card" style="padding:14px 16px;">
+      <button onclick="toggleBookmarklet(this)" style="width:100%; text-align:left; border:none; background:transparent; padding:0; font-size:13px; font-weight:600; color:#374151; display:flex; justify-content:space-between; align-items:center;">
+        <span>📌 記録用ブックマークレットの設定（初回のみ）</span>
+        <span class="toggle-arrow">▼</span>
+      </button>
+      <div id="bookmarklet-body" style="display:none; margin-top:12px; font-size:12px; color:#6b7280; line-height:1.7;">
+        <ol style="padding-left:18px; margin-bottom:10px;">
+          <li>下の「コードをコピー」を押す</li>
+          <li>Safariで適当なページを開き、共有ボタン→「ブックマークを追加」で1件ブックマークを作る</li>
+          <li>ブックマーク一覧で「編集」→今作ったブックマークをタップ</li>
+          <li>「アドレス」欄の中身を全部消して、コピーしたコードを貼り付けて保存</li>
+        </ol>
+        <div style="margin-bottom:10px;">これで、ROOMページを開いた状態でこのブックマークをタップするだけで、記録が送信されるようになります。</div>
+        <button onclick="copyBookmarklet(this)" style="width:100%; padding:9px; border:1.5px solid #e5e7eb; border-radius:8px; background:#fff; font-size:12px; font-weight:600; color:#374151;">コードをコピー</button>
+      </div>
     </div>
   </div>
 
@@ -167,6 +186,32 @@ tr:last-child td { border-bottom: none; }
 const LABELS = { followers:'フォロワー数', following:'フォロー数', posts:'投稿数', likes:'いいね数' };
 const COLORS  = { followers:'#3b82f6', following:'#10b981', posts:'#f59e0b', likes:'#ef4444' };
 const SCOPES  = { '1w':7, '1m':30, '3m':90, '1y':365, 'all':99999 };
+
+const WEBAPP_URL = '<?= baseUrl ?>';
+const BOOKMARKLET_CODE = "javascript:(function(){var u=(window.__INITIAL_STATE__&&window.__INITIAL_STATE__.userData)||{};var d={action:'receiveStats',url:location.href,followers:u.followers,following:u.following_users,posts:u.collections,likes:u.likes,rank:u.rank!=null?String(u.rank):''};try{navigator.sendBeacon('" + WEBAPP_URL + "',new Blob([JSON.stringify(d)],{type:'application/json'}));}catch(e){}alert('楽天ROOMトラッカー: 記録しました');})();";
+
+function toggleBookmarklet(btn) {
+  const body = document.getElementById('bookmarklet-body');
+  const isOpen = body.style.display === 'block';
+  body.style.display = isOpen ? 'none' : 'block';
+  const arrow = btn.querySelector('.toggle-arrow');
+  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function copyBookmarklet(btn) {
+  const done = () => {
+    const original = btn.textContent;
+    btn.textContent = 'コピーしました！';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(BOOKMARKLET_CODE).then(done).catch(() => {
+      btn.textContent = 'コピーに失敗しました。手動で選択してください';
+    });
+  } else {
+    btn.textContent = 'このブラウザではコピーできません';
+  }
+}
 
 let allRows = [], latest = null, prev = null;
 let currentMetric = 'followers', currentScope = '1w', chartInst = null;
